@@ -7,7 +7,7 @@ import multiprocessing as mp
 totalLength = 1000000
 
 # total number of groups the list is to be split into
-groupSize = 100
+groupSize = 1000
 
 # maximum number to be generated in the list to be sorted
 maxSize = 500000
