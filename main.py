@@ -4,7 +4,9 @@ import threading
 import multiprocessing as mp
 import cProfile
 import os
+import dispy
 from multiprocessing import Process, Value, Array
+
 #  size of the list to be sorted
 totalLength = 1000000
 
@@ -80,6 +82,14 @@ def sort_set(arr):
           return
 
 
+
+def dispySort(list):
+    import time, socket
+    sort_set(list)
+
+    return list
+
+
 def sort(iqueue, oqueue, timeDebugging, timeSortQueue):
    inSortStartTime = time.time()
    while True:
@@ -111,55 +121,6 @@ def generateList():
    return output
 
 
-def merge(iqueue, oqueue):
-   # UNUSED FUNCTION (NOT WORKING ATTEMPT AT MULTIPROCESSING THE MERGING SEQUENCE) ====================================================
-   while True:
-       if (iqueue.empty()):
-         print("BREAK")
-         break
-       #print(time.perf_counter())
-       key1 = iqueue.get()
-       if (iqueue.empty()):
-         print("BREAK2")
-         iqueue.put(key1)
-         continue
-       key2 = iqueue.get()
-       ikey1 = 0
-       ikey2 = 0
-       a_res = []
-       # x = 0
-
-
-       while ikey1 < len(key1) and ikey2 < len(key2):
-           # print("{} -> {} {}".format(x, ikey1, ikey2))
-           # x+=1
-           if key1[ikey1] > key2[ikey2]:
-             a_res.append(key2[ikey2])
-             ikey2 += 1
-           elif key1[ikey1] < key2[ikey2]:
-             a_res.append(key1[ikey1])
-             ikey1 += 1
-           else:
-             a_res.append(key2[ikey2])
-             ikey2 += 1
-             a_res.append(key1[ikey1])
-             ikey1 += 1
-
-
-       if ((ikey1 == len(key1)) and
-             (ikey2 < len(key2))):
-         a_res.extend(key2[ikey2:])
-       if ((ikey1 < len(key1)) and
-             (ikey2 == len(key2))):
-         a_res.extend(key1[ikey1:])
-       # print("*" * 10)
-       # print(a_res)
-       if(len(a_res) == totalLength):
-         oqueue.put(a_res)
-         print("BREAK3")
-         break
-       iqueue.put(a_res)
-
 
 if __name__ == '__main__':
    print("STARTED")
@@ -169,13 +130,6 @@ if __name__ == '__main__':
    sortTime = Value('d', 0.0)
 
 
-   preSortQueue = mp.Queue()
-   postSortQueue = mp.Queue()
-   sortTimeQueue = mp.Queue()
-   sortProcesses = [mp.Process(target=sort, args=(preSortQueue, postSortQueue, sortTime, sortTimeQueue)) for i in range(processCount)]
-
-   for process in sortProcesses:
-       process.start()
 
    # generate list, break it into groups, and add to the queue
    startTimeCreateList = time.time()
@@ -184,21 +138,37 @@ if __name__ == '__main__':
    startTimeSplitList = time.time()
    messages = breakdown(inputList, groupSize)
    endTimeSplitList = time.time() - startTimeSplitList
-   for message in messages:
-       preSortQueue.put(message)
-
-   for n in range(processCount):
-       preSortQueue.put("DONE")
+   cluster = dispy.JobCluster(dispySort, nodes=['192.168.0.*'], host=['192.168.0.1'], depends=[sort_set])
 
    print("CREATED MILLION LIST QUEUE")
-
+   jobs = []
+   for list in messages:
+       job = cluster.submit(list)
+       jobs.append(job)
    mergeTimeStart = time.time()
+   # for job in jobs:
+   #     key1 = job()
+   #     print(key1)
 
-   while True:
+
+   mergeList = []
+   while (True):
        # merge lists coming out of the out queue
+       key1 = []
+       key2 = []
+       if len(jobs) > 0:
+           job1 = jobs.pop(0)
+           key1 = job1()
+       else:
+           key1 = mergeList.pop(0)
 
-       key1 = postSortQueue.get()
-       key2 = postSortQueue.get()
+       if len(jobs) > 0:
+           job2 = jobs.pop(0)
+           key2 = job2()
+       else:
+           key2 = mergeList.pop(0)
+
+
        ikey1 = 0
        ikey2 = 0
 
@@ -237,14 +207,7 @@ if __name__ == '__main__':
            break
 
        # if not the final list, put it back into the queue to be merged again
-       postSortQueue.put(a_res)
+       mergeList.append(a_res)
    print("Total Create Time: {:.0f} Milliseconds".format(endTimeCreateList*1000))
    print("Total Split Time: {:.0f} Milliseconds".format(endTimeSplitList*1000))
-   print("Total Sort Time: {:.0f} Milliseconds".format(sortTime.value*1000))
-   for n in range(processCount):
-       print("Sort time in process {} Milliseconds".format(sortTimeQueue.get()))
-   print("Total Merge Total Time: {:.0f} Milliseconds".format(timeToMergeTotal*1000)) # THE MERGE IS THE BOTTLENECK, IT TAKES LONGER THAN ANY OTHER FUNCTION
-
-   for process in sortProcesses:
-       process.kill()
-
+   # print("Total Sort Time: {:.0f} Milliseconds".format(sortTime.value*1000))
