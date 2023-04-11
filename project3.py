@@ -55,7 +55,8 @@ def printOneThousand(fileName):
 
 if __name__ == '__main__':
    print("STARTED")
-
+   open(mergeFileOne, 'w').close()
+   open(mergeFileTwo, 'w').close()
    # Debugging
    startTime = time.time()
    cluster = dispy.JobCluster(dispySort, nodes=['192.168.0.*'], host=['192.168.0.1'], depends=[sort_set])
