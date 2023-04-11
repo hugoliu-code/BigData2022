@@ -7,9 +7,9 @@ import os
 import dispy
 from multiprocessing import Process, Value, Array
 
-originalFileName = "/Users/issue/Downloads/data1.txt"
-mergeFileOne = "merge1"
-mergeFileTwo = "merge2"
+originalFileName = "/root/data1.set"
+mergeFileOne = "/root/merge1.txt"
+mergeFileTwo = "/root/merge2.txt"
 
 
 def sort_set(arr):
