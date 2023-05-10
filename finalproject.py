@@ -1,4 +1,4 @@
-import random
+                                                                                                                                                                                                                                                                                                                                                                                                                                                              final.py                                                                                                                                                                                                                                                                                                                                                                                                                                                               Modified  import random
 import time
 import threading
 import multiprocessing as mp
@@ -6,9 +6,6 @@ import cProfile
 import os
 import dispy
 from multiprocessing import Process, Value, Array
-
-mergeFileOne = "/mnt/usb1/merge1.txt"
-mergeFileTwo = "/mnt/usb1/merge2.txt"
 
 def sort_set(arr):
    n = len(arr)
@@ -23,7 +20,7 @@ def sort_set(arr):
 
       if not swapped:
           return
-          
+
 def dispySort(file_location):
     print("Hello Test")
     import time, socket
@@ -39,10 +36,11 @@ def dispySort(file_location):
 
     sort_set(list)
     new_file_location = file_location[:-4]+"F.txt"
+    text = ""
+    for num in list:
+        text += (str(num)+'\n')
     with open(new_file_location, 'w') as f:
-        # Write each integer in the list followed by a newline character
-        for num in list:
-            f.write(str(num) + '\n')
+        f.write(text)
     print(new_file_location)
     return new_file_location[4:]
 
@@ -51,7 +49,7 @@ def files_split(input_file_name):
     #list of file names to return
     file_name_list = []
     # set the section size in bytes
-    section_size = 100000
+    section_size = 30000
     # open the input file for reading in binary mode
 
     # get the current directory
@@ -60,7 +58,7 @@ def files_split(input_file_name):
     # iterate through the files in the directory
     for filename in os.listdir(current_dir):
         # check if the file starts with "output"
-        if filename.startswith("output"):
+        if filename.startswith("output") or filename.startswith("merged"):
             # construct the full path to the file
             file_path = os.path.join(current_dir, filename)
 
@@ -69,6 +67,7 @@ def files_split(input_file_name):
 
             # print a message to indicate which file was deleted
             print(f"Deleted file: {file_path}")
+
     with open(input_file_name, "rb") as infile:
         # initialize the section count and the position
         section_count = 0
@@ -108,7 +107,7 @@ def files_split(input_file_name):
             infile.seek(position)
             data = infile.read(section_size + num_added)
         return file_name_list
-        
+
 def merge(fileone, filetwo, filethree):
     import sys
     totalsize = 0
@@ -117,10 +116,10 @@ def merge(fileone, filetwo, filethree):
     with open(fileone, 'r') as f1, open(filetwo, 'r') as f2, open(filethree, "w") as f3:
         while(True):
             line1 = f1.readline()
-            totalsize += 1
             if not line1:
                 line1 = -1
-
+            else:
+                totalsize += 1
             while(True):
                 if(line2cache != -1):
                     line2 = line2cache
@@ -140,8 +139,11 @@ def merge(fileone, filetwo, filethree):
             if finished:
                 break
             f3.write(str(line1))
+    return totalsize
 
 if __name__ == "__main__":
+    starttime = time.time()
+    import queue
     print("Started")
     file_name_list = files_split("/mnt/usb1/milliontest.txt")
     print("Split")
@@ -152,24 +154,43 @@ if __name__ == "__main__":
         job = cluster.submit(n)
         jobs.append(job)
     print("Jobs Assigned")
-    with open(mergeFileOne, 'w') as file:
-        pass
-    with open(mergeFileTwo, 'w') as file:
-        pass
-
-
-    f1=mergeFileOne
-    f2=mergeFileTwo
     finallocation = ""
-    while(True):
-        job1 = jobs.pop(0)
-        inputfile = job1()
+    merged_num = 0
+    jobs_popped = 0
+    file_locations = queue.Queue()
+    print(len(jobs))
+    while (True):
+        inputfile_one = ""
+        #print("Before Job1: " + str(jobs_popped) + " " + str(len(jobs)))
+        if(jobs_popped < len(file_name_list)):
+            #print("In Job1")
+            job1 = jobs.pop(0)
+            jobs_popped += 1
+            inputfile_one = job1()
+            #print("Got Job1 " + str(jobs_popped))
+        else:
+            inputfile_one = file_locations.get()
+            #print("Got From File " + inputfile_one)
+
+        inputfile_two = ""
+        #print("Before Job2: " + str(jobs_popped) + " " + str(len(jobs)))
+        if(jobs_popped < len(file_name_list)):
+            #print("In Job2")
+            job2 = jobs.pop(0)
+            jobs_popped += 1
+            inputfile_two = job2()
+            #print("Got Job2 " + str(jobs_popped))
+        else:
+            inputfile_two = file_locations.get()
+            #print("Got From File " + inputfile_two)
         print("Merging...")
-        size = merge(inputfile, f1, f2)
-        if(size == 1000000):
+        size = merge(inputfile_one, inputfile_two, "/mnt/usb1/merged{}.txt".format(merged_num))
+        file_locations.put("/mnt/usb1/merged{}.txt".format(merged_num))
+        merged_num += 1
+        print(size)
+        if (size == 1000000):
+            finallocation = "/mnt/usb1/merged{}.txt".format(merged_num-1)
             break
-        temp = f1
-        finallocation = f2
-        f1 = f2
-        f2 = temp
+
+    print("Time: " + time.time()-starttime)
     print("Final Location: " + finallocation)
